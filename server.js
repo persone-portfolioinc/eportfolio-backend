@@ -4,24 +4,24 @@ const { Octokit } = require('@octokit/rest');
 const fs = require('fs').promises;
 const path = require('path');
 const cors = require('cors');
-const sanitizeHtml = require('sanitize-html');
 const rateLimit = require('express-rate-limit');
+const sanitizeHtml = require('sanitize-html');
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-// GitHub token and organization
+// GitHub token and username
 const githubToken = process.env.GITHUB_TOKEN;
-const githubOrg = process.env.GITHUB_ORG || 'persone-portfolioinc';
+const githubUser = process.env.GITHUB_USER;
 
-if (!githubToken || !githubOrg) {
-  console.error('GITHUB_TOKEN and GITHUB_ORG must be set in environment variables');
+if (!githubToken || !githubUser) {
+  console.error('GITHUB_TOKEN and GITHUB_USER must be set in environment variables');
   process.exit(1);
 }
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
-  destination: './Uploads',
+  destination: './uploads',
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname);
     cb(null, `${Date.now()}-${file.fieldname}${ext}`);
@@ -44,17 +44,13 @@ const upload = multer({
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(rateLimit({
+
+// Rate limiting
+const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // Limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.',
-}));
-
-// Sanitization options
-const sanitizeOptions = {
-  allowedTags: [],
-  allowedAttributes: {},
-};
+});
+app.use('/api/generate', limiter);
 
 // Base template structure
 const baseTemplate = (colors) => `<!DOCTYPE html>
@@ -66,7 +62,7 @@ const baseTemplate = (colors) => `<!DOCTYPE html>
   <meta name="keywords" content="{keywords}, portfolio, {profession}" />
   <title>{name} | {profession} Portfolio</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Poppins:wght@500;700&display=swap" rel="stylesheet">
-  <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/aos@2.3.1/dist/aos.css" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Inter', sans-serif; background: ${colors.bodyBg}; color: ${colors.text}; line-height: 1.8; overflow-x: hidden; }
@@ -190,8 +186,8 @@ const baseTemplate = (colors) => `<!DOCTYPE html>
     <p>Contact: <a href="mailto:{email}" aria-label="Email">{email}</a> | {phone}</p>
     <p>© 2025 {name} | {profession} Portfolio</p>
   </footer>
-  <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/vanilla-tilt/1.7.0/vanilla-tilt.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/aos@2.3.1/dist/aos.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vanilla-tilt@1.7.0/dist/vanilla-tilt.min.js"></script>
   <script>
     AOS.init({ duration: 1200, easing: 'ease-out-quart', once: true });
     VanillaTilt.init(document.querySelectorAll('.project'), { max: 8, speed: 400, glare: true, 'max-glare': 0.3 });
@@ -332,11 +328,11 @@ app.post('/api/generate', upload.fields([{ name: 'cv' }, { name: 'image' }]), as
     if (!name || !profession || !email) {
       return res.status(400).json({ error: 'Name, profession, and email are required' });
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
       return res.status(400).json({ error: 'Invalid email format' });
-    }
-    if (linkedin && !/^https?:\/\/(www\.)?linkedin\.com\/.+$/.test(linkedin)) {
-      return res.status(400).json({ error: 'Invalid LinkedIn URL' });
     }
 
     // Validate template
@@ -344,25 +340,15 @@ app.post('/api/generate', upload.fields([{ name: 'cv' }, { name: 'image' }]), as
       return res.status(400).json({ error: 'Invalid template selected' });
     }
 
-    // Sanitize inputs
-    const sanitizedData = {
-      name: sanitizeHtml(name, sanitizeOptions),
-      profession: sanitizeHtml(profession, sanitizeOptions),
-      tagline: sanitizeHtml(tagline, sanitizeOptions),
-      summary: sanitizeHtml(summary, sanitizeOptions),
-      about: sanitizeHtml(about, sanitizeOptions),
-      email: sanitizeHtml(email, sanitizeOptions),
-      linkedin: sanitizeHtml(linkedin, sanitizeOptions),
-      phone: sanitizeHtml(phone, sanitizeOptions),
-    };
-
-    // Parse JSON fields
-    const parsedSkills = JSON.parse(skills || '[]').map(skill => sanitizeHtml(skill, sanitizeOptions));
+    // Parse and sanitize JSON fields
+    const parsedSkills = JSON.parse(skills || '[]').map(skill => sanitizeHtml(skill));
     const parsedProficiencies = JSON.parse(skillProficiencies || '[]');
     const parsedProjects = JSON.parse(projects || '[]').map(project => ({
-      title: sanitizeHtml(project.title, sanitizeOptions),
-      description: sanitizeHtml(project.description, sanitizeOptions),
-      category: sanitizeHtml(project.category, sanitizeOptions),
+      ...project,
+      title: sanitizeHtml(project.title),
+      description: sanitizeHtml(project.description),
+      link: project.link ? sanitizeHtml(project.link) : '',
+      category: sanitizeHtml(project.category),
     }));
 
     // Validate skills and proficiencies
@@ -383,20 +369,34 @@ app.post('/api/generate', upload.fields([{ name: 'cv' }, { name: 'image' }]), as
       )
       .join('');
 
-    // Generate projects HTML
+    // Generate projects HTML (only include link if provided)
     const projectsHtml = parsedProjects
-      .filter(project => project.title) // Only include projects with titles
+      .filter(project => project.title && project.description) // Only include projects with title and description
       .map(
         (project, index) => `
         <article class="project" data-tilt data-tilt-max="8" data-aos="fade-up" data-aos-delay="${100 + index * 100}">
           <div>
             <h3>${project.title || 'Project ' + (index + 1)}</h3>
             <p>${project.description || 'No description provided'}</p>
+            ${project.link ? `<a href="${project.link}" target="_blank">View Project</a>` : ''}
             <span class="project-badge">${project.category || 'General'}</span>
           </div>
         </article>`
       )
       .join('');
+
+    // Sanitize all inputs
+    const sanitizedData = {
+      name: sanitizeHtml(name),
+      profession: sanitizeHtml(profession),
+      tagline: sanitizeHtml(tagline),
+      summary: sanitizeHtml(summary),
+      about: sanitizeHtml(about),
+      email: sanitizeHtml(email),
+      linkedin: linkedin ? sanitizeHtml(linkedin) : 'https://linkedin.com',
+      phone: sanitizeHtml(phone),
+      keywords: parsedSkills.join(', '),
+    };
 
     // Select template
     let generatedHtml = templates[selectedTemplate]
@@ -408,26 +408,25 @@ app.post('/api/generate', upload.fields([{ name: 'cv' }, { name: 'image' }]), as
       .replace(/{email}/g, sanitizedData.email || 'your.email@example.com')
       .replace(/{linkedin}/g, sanitizedData.linkedin || 'https://linkedin.com')
       .replace(/{phone}/g, sanitizedData.phone || 'Your Phone Number')
-      .replace(/{keywords}/g, parsedSkills.join(', ') || 'your-keywords')
+      .replace(/{keywords}/g, sanitizedData.keywords || 'your-keywords')
       .replace(/{skills}/g, skillsHtml)
       .replace(/{projects}/g, projectsHtml);
 
     // Initialize Octokit
     const octokit = new Octokit({ auth: githubToken });
 
-    // Create a new GitHub repository under the organization
+    // Create a new GitHub repository under the user's account
     const repoName = `eportfolio-${sanitizedData.name.toLowerCase().replace(/\s/g, '-')}-${Date.now()}`;
-    const repoResponse = await octokit.repos.createInOrg({
-      org: githubOrg,
+    const repoResponse = await octokit.repos.createForAuthenticatedUser({
       name: repoName,
       auto_init: true,
-      homepage: `https://${githubOrg}.github.io/${repoName}`,
+      homepage: `https://${githubUser}.github.io/${repoName}`,
     });
 
     // Enable GitHub Pages
     try {
       await octokit.repos.createPagesSite({
-        owner: githubOrg,
+        owner: githubUser,
         repo: repoName,
         source: { branch: 'main', path: '/' },
       });
@@ -460,7 +459,7 @@ app.post('/api/generate', upload.fields([{ name: 'cv' }, { name: 'image' }]), as
     for (const file of filesToCommit) {
       try {
         await octokit.repos.createOrUpdateFileContents({
-          owner: githubOrg,
+          owner: githubUser,
           repo: repoName,
           path: file.path,
           message: `Add ${file.path}`,
@@ -479,7 +478,7 @@ app.post('/api/generate', upload.fields([{ name: 'cv' }, { name: 'image' }]), as
     if (imageFile) await fs.unlink(imageFile.path).catch(() => {});
 
     // Return the GitHub Pages URL
-    res.json({ url: `https://${githubOrg}.github.io/${repoName}` });
+    res.json({ url: `https://${githubUser}.github.io/${repoName}` });
   } catch (error) {
     console.error('Error generating ePortfolio:', error);
     res.status(500).json({ error: error.message || 'Failed to generate ePortfolio' });
