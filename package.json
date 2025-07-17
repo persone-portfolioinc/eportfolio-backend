@@ -1,1 +1,17 @@
-
+{
+  "name": "eportfolio-backend",
+  "version": "1.0.1",
+  "description": "Backend for ePortfolio generator",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "multer": "^1.4.5-lts.1",
+    "@octokit/rest": "^20.1.1",
+    "cors": "^2.8.5",
+    "sanitize-html": "^2.13.0",
+    "express-rate-limit": "^7.4.0"
+  }
+}
