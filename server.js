@@ -1,4 +1,3 @@
-
 const express = require('express');
 const multer = require('multer');
 const { Octokit } = require('@octokit/rest');
@@ -281,28 +280,28 @@ const templates = {
     footerBg: '#111827',
   }),
   vibrant: baseTemplate({
-    bodyBg: '#f9fafb', // Soft light gray – clean canvas
-    text: '#111827', // Deep slate – sharp, readable
-    navBg: '#1e3a8a', // Navy blue – confident, trust-building
-    navText: '#ffffff', // Crisp white – contrast against navy
-    accent: '#0ea5e9', // Sky blue – fresh, modern highlight
-    accentGradient: 'linear-gradient(90deg, #0ea5e9, #2563eb)', // Sky to royal blue
-    accentHover: 'rgba(14, 165, 233, 0.1)', // Soft hover
-    accentHoverSolid: '#2563eb', // Royal blue – slightly bolder
-    heroBg: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)', // Strong and sleek
-    heroOverlay: 'rgba(30, 58, 138, 0.6)', // Adds depth
-    heroText: '#ffffff',
-    buttonBg: 'linear-gradient(90deg, #0ea5e9 0%, #2563eb 100%)', // Vibrant CTA
-    buttonHover: 'linear-gradient(90deg, #2563eb 0%, #1e3a8a 100%)',
-    buttonText: '#ffffff',
-    sectionBg: '#ffffff', // Clean sections
-    skillBg: '#f1f5f9', // Light slate – minimal contrast
-    skillHoverText: '#0ea5e9', // Consistent with accent
-    progressBg: '#e5e7eb', // Subtle progress track
-    projectBg: '#f9fafb', // Consistent with body
-    secondaryText: '#6b7280', // Cool gray – for labels
-    footerBg: '#1e3a8a', // Matches nav – anchors the design
-}),
+    bodyBg: 'linear-gradient(135deg, #fef3c7 0%, #f3e8ff 100%)',
+    text: '#2d3748',
+    navBg: 'linear-gradient(90deg, #ec4899 0%, #f43f5e 100%)',
+    navText: '#fff',
+    accent: '#4c1d95',
+    accentGradient: 'linear-gradient(90deg, #4c1d95, #6d28d9)',
+    accentHover: 'rgba(76, 29, 149, 0.3)',
+    accentHoverSolid: '#6d28d9',
+    heroBg: 'linear-gradient(135deg, #ec4899 0%, #f43f5e 100%)',
+    heroOverlay: 'rgba(236, 72, 153, 0.7)',
+    heroText: '#fff',
+    buttonBg: 'linear-gradient(90deg, #4c1d95 0%, #6d28d9 100%)',
+    buttonHover: 'linear-gradient(90deg, #6d28d9 0%, #5b21b6 100%)',
+    buttonText: '#fff',
+    sectionBg: 'rgba(255, 255, 255, 0.98)',
+    skillBg: 'linear-gradient(135deg, #fef3c7 0%, #f3e8ff 100%)',
+    skillHoverText: '#fff',
+    progressBg: '#f3e8ff',
+    projectBg: '#fef3c7',
+    secondaryText: '#6b7280',
+    footerBg: '#ec4899',
+  }),
 };
 
 // API endpoint to generate ePortfolio
